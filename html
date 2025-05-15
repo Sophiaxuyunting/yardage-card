@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golf Yardage Card (Metres & Gaps)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f9ff; }
+        .container { max-width: 800px; }
+        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #0284c7; color: white; }
+        tr:nth-child(even) { background-color: #f1f5f9; }
+        tr:hover { background-color: #e0f2fe; }
+        input[type="text"], input[type="number"] {
+            border: 1px solid #cbd5e1;
+            padding: 8px 10px;
+            border-radius: 0.375rem;
+            width: 100%;
+        }
+        button {
+            padding: 10px 15px;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-primary { background-color: #0ea5e9; color: white; }
+        .btn-primary:hover { background-color: #0284c7; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .feedback {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 0.375rem;
+            font-size: 0.9rem;
+        }
+        .feedback-success { background-color: #d1fae5; color: #065f46; }
+        .feedback-error { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body class="text-gray-800 p-4 md:p-8">
+    <div class="container mx-auto bg-white p-6 shadow-xl rounded-lg">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-sky-700">Golf Yardage Card</h1>
+            <p class="text-md text-gray-600">Enter your clubs and distances in metres. Sorted by carry distance (shortest to longest).</p>
+        </header>
+
+        <div id="feedbackArea" class="feedback hidden"></div>
+
+        <form id="yardageForm" class="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+                <label for="clubName" class="block text-sm font-medium text-gray-700 mb-1">Club Name:</label>
+                <input type="text" id="clubName" name="clubName" required class="focus:ring-sky-500 focus:border-sky-500">
+            </div>
+            <div>
+                <label for="carryDistance" class="block text-sm font-medium text-gray-700 mb-1">Carry Distance (metres):</label>
+                <input type="number" id="carryDistance" name="carryDistance" min="0" required class="focus:ring-sky-500 focus:border-sky-500">
+            </div>
+            <div>
+                <label for="totalDistance" class="block text-sm font-medium text-gray-700 mb-1">Total Distance (metres):</label>
+                <input type="number" id="totalDistance" name="totalDistance" min="0" required class="focus:ring-sky-500 focus:border-sky-500">
+            </div>
+            <button type="submit" class="btn-primary h-10">Add Club</button>
+        </form>
+
+        <div class="overflow-x-auto">
+            <table id="yardageTable" class="min-w-full bg-white">
+                <thead>
+                    <tr>
+                        <th>Club</th>
+                        <th>Carry (m)</th>
+                        <th>Total (m)</th>
+                        <th>Carry Gap (m)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="yardageTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="mt-6 text-right">
+            <button id="clearAllButton" class="btn-danger">Clear All Data</button>
+        </div>
+    </div>
+
+    <script>
+        const yardageForm = document.getElementById('yardageForm');
+        const yardageTableBody = document.getElementById('yardageTableBody');
+        const clearAllButton = document.getElementById('clearAllButton');
+        const feedbackArea = document.getElementById('feedbackArea');
+        const localStorageKey = 'golfYardagesMetresGaps';
+
+        let yardages = [];
+
+        function showFeedback(message, type = 'success') {
+            feedbackArea.textContent = message;
+            feedbackArea.className = 'feedback'; // Reset classes
+            if (type === 'success') {
+                feedbackArea.classList.add('feedback-success');
+            } else {
+                feedbackArea.classList.add('feedback-error');
+            }
+            feedbackArea.classList.remove('hidden');
+            setTimeout(() => {
+                feedbackArea.classList.add('hidden');
+            }, 3000);
+        }
+
+        function saveYardagesToStorage() {
+            localStorage.setItem(localStorageKey, JSON.stringify(yardages));
+        }
+
+        function loadYardagesFromStorage() {
+            const storedYardages = localStorage.getItem(localStorageKey);
+            if (storedYardages) {
+                yardages = JSON.parse(storedYardages);
+                // Ensure sorting when loading
+                yardages.sort((a, b) => a.carry - b.carry);
+            }
+        }
+
+        function renderYardageTable() {
+            yardageTableBody.innerHTML = ''; // Clear existing rows
+
+            // Ensure yardages are sorted by carry distance (ascending) before rendering
+            yardages.sort((a, b) => a.carry - b.carry);
+
+            if (yardages.length === 0) {
+                const row = yardageTableBody.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 5; // Adjusted colspan
+                cell.textContent = 'No clubs added yet. Add some using the form above!';
+                cell.className = 'text-center text-gray-500 py-4';
+                return;
+            }
+
+            yardages.forEach((club, index) => {
+                const row = yardageTableBody.insertRow();
+                row.insertCell().textContent = club.name;
+                row.insertCell().textContent = club.carry;
+                row.insertCell().textContent = club.total;
+
+                // Calculate Carry Gap
+                let carryGap = "-";
+                if (index > 0) { // Gap is with the previous club (which is shorter carry)
+                    carryGap = club.carry - yardages[index - 1].carry;
+                } else if (yardages.length > 1 && index === 0) {
+                    // For the shortest club, if there are other clubs, show gap to next
+                    // Or, keep it simple and only show gap to previous, so first is always "-"
+                    // Let's stick to the first club having "-" for simplicity of "gap to previous"
+                }
+                row.insertCell().textContent = carryGap;
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.className = 'btn-danger !py-1 !px-2 text-xs';
+                deleteButton.onclick = () => handleDeleteClubByName(club.name);
+                const actionsCell = row.insertCell();
+                actionsCell.appendChild(deleteButton);
+            });
+        }
+
+        function handleAddClub(event) {
+            event.preventDefault();
+            const clubNameInput = document.getElementById('clubName');
+            const carryDistanceInput = document.getElementById('carryDistance');
+            const totalDistanceInput = document.getElementById('totalDistance');
+
+            const name = clubNameInput.value.trim();
+            const carry = parseInt(carryDistanceInput.value, 10);
+            const total = parseInt(totalDistanceInput.value, 10);
+
+            if (!name || isNaN(carry) || isNaN(total) || carry < 0 || total < 0) {
+                showFeedback('Please enter valid club name and non-negative distances.', 'error');
+                return;
+            }
+
+            if (carry > total) {
+                showFeedback('Carry distance cannot be greater than total distance.', 'error');
+                return;
+            }
+
+            if (yardages.some(club => club.name.toLowerCase() === name.toLowerCase())) {
+                showFeedback(`Club "${name}" already exists. Delete it first if you want to re-add.`, 'error');
+                return;
+            }
+
+            yardages.push({ name, carry, total });
+            saveYardagesToStorage();
+            renderYardageTable(); // This will also sort
+            showFeedback(`Club "${name}" added successfully!`);
+            yardageForm.reset();
+            clubNameInput.focus();
+        }
+
+        function handleDeleteClubByName(clubName) {
+            yardages = yardages.filter(club => club.name !== clubName);
+            saveYardagesToStorage();
+            renderYardageTable();
+            showFeedback(`Club "${clubName}" deleted.`);
+        }
+
+        function handleClearAll() {
+            if (confirm('Are you sure you want to delete all yardage data? This cannot be undone.')) {
+                yardages = [];
+                saveYardagesToStorage();
+                renderYardageTable();
+                showFeedback('All yardage data cleared.');
+            }
+        }
+
+        // Initial setup
+        yardageForm.addEventListener('submit', handleAddClub);
+        clearAllButton.addEventListener('click', handleClearAll);
+        loadYardagesFromStorage();
+        renderYardageTable();
+    </script>
+</body>
+</html>
