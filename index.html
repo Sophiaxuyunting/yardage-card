@@ -86,17 +86,30 @@
     </div>
 
     <script>
-        const yardageForm = document.getElementById('yardageForm');
-        const yardageTableBody = document.getElementById('yardageTableBody');
-        const clearAllButton = document.getElementById('clearAllButton');
-        const feedbackArea = document.getElementById('feedbackArea');
+        // Type definitions
+        interface Club {
+            name: string;
+            carry: number;
+            total: number;
+        }
+
+        // DOM element references with type assertions
+        const yardageForm = document.getElementById('yardageForm') as HTMLFormElement;
+        const yardageTableBody = document.getElementById('yardageTableBody') as HTMLTableSectionElement;
+        const clearAllButton = document.getElementById('clearAllButton') as HTMLButtonElement;
+        const feedbackArea = document.getElementById('feedbackArea') as HTMLDivElement;
+        const clubNameInput = document.getElementById('clubName') as HTMLInputElement;
+        const carryDistanceInput = document.getElementById('carryDistance') as HTMLInputElement;
+        const totalDistanceInput = document.getElementById('totalDistance') as HTMLInputElement;
+
         const localStorageKey = 'golfYardagesMetresGaps';
+        let yardages: Club[] = [];
 
-        let yardages = [];
-
-        function showFeedback(message, type = 'success') {
+        function showFeedback(message: string, type: 'success' | 'error' = 'success'): void {
+            if (!feedbackArea) return;
+            
             feedbackArea.textContent = message;
-            feedbackArea.className = 'feedback'; // Reset classes
+            feedbackArea.className = 'feedback';
             if (type === 'success') {
                 feedbackArea.classList.add('feedback-success');
             } else {
@@ -108,29 +121,28 @@
             }, 3000);
         }
 
-        function saveYardagesToStorage() {
+        function saveYardagesToStorage(): void {
             localStorage.setItem(localStorageKey, JSON.stringify(yardages));
         }
 
-        function loadYardagesFromStorage() {
+        function loadYardagesFromStorage(): void {
             const storedYardages = localStorage.getItem(localStorageKey);
             if (storedYardages) {
                 yardages = JSON.parse(storedYardages);
-                // Ensure sorting when loading
                 yardages.sort((a, b) => a.carry - b.carry);
             }
         }
 
-        function renderYardageTable() {
-            yardageTableBody.innerHTML = ''; // Clear existing rows
-
-            // Ensure yardages are sorted by carry distance (ascending) before rendering
+        function renderYardageTable(): void {
+            if (!yardageTableBody) return;
+            
+            yardageTableBody.innerHTML = '';
             yardages.sort((a, b) => a.carry - b.carry);
 
             if (yardages.length === 0) {
                 const row = yardageTableBody.insertRow();
                 const cell = row.insertCell();
-                cell.colSpan = 5; // Adjusted colspan
+                cell.colSpan = 5;
                 cell.textContent = 'No clubs added yet. Add some using the form above!';
                 cell.className = 'text-center text-gray-500 py-4';
                 return;
@@ -139,18 +151,14 @@
             yardages.forEach((club, index) => {
                 const row = yardageTableBody.insertRow();
                 row.insertCell().textContent = club.name;
-                row.insertCell().textContent = club.carry;
-                row.insertCell().textContent = club.total;
+                row.insertCell().textContent = club.carry.toString();
+                row.insertCell().textContent = club.total.toString();
 
-                // Calculate Carry Gap
                 let carryGap = "-";
-                if (index > 0) { // Gap is with the previous club (which is shorter carry)
-                    carryGap = club.carry - yardages[index - 1].carry;
-                } else if (yardages.length > 1 && index === 0) {
-                    // For the shortest club, if there are other clubs, show gap to next
-                    // Or, keep it simple and only show gap to previous, so first is always "-"
-                    // Let's stick to the first club having "-" for simplicity of "gap to previous"
+                if (index > 0) {
+                    carryGap = (club.carry - yardages[index - 1].carry).toString();
                 }
+
                 row.insertCell().textContent = carryGap;
 
                 const deleteButton = document.createElement('button');
@@ -162,11 +170,10 @@
             });
         }
 
-        function handleAddClub(event) {
+        function handleAddClub(event: Event): void {
             event.preventDefault();
-            const clubNameInput = document.getElementById('clubName');
-            const carryDistanceInput = document.getElementById('carryDistance');
-            const totalDistanceInput = document.getElementById('totalDistance');
+            
+            if (!clubNameInput || !carryDistanceInput || !totalDistanceInput) return;
 
             const name = clubNameInput.value.trim();
             const carry = parseInt(carryDistanceInput.value, 10);
@@ -189,20 +196,21 @@
 
             yardages.push({ name, carry, total });
             saveYardagesToStorage();
-            renderYardageTable(); // This will also sort
+            renderYardageTable();
             showFeedback(`Club "${name}" added successfully!`);
-            yardageForm.reset();
-            clubNameInput.focus();
+            
+            if (yardageForm) yardageForm.reset();
+            if (clubNameInput) clubNameInput.focus();
         }
 
-        function handleDeleteClubByName(clubName) {
+        function handleDeleteClubByName(clubName: string): void {
             yardages = yardages.filter(club => club.name !== clubName);
             saveYardagesToStorage();
             renderYardageTable();
             showFeedback(`Club "${clubName}" deleted.`);
         }
 
-        function handleClearAll() {
+        function handleClearAll(): void {
             if (confirm('Are you sure you want to delete all yardage data? This cannot be undone.')) {
                 yardages = [];
                 saveYardagesToStorage();
@@ -212,8 +220,8 @@
         }
 
         // Initial setup
-        yardageForm.addEventListener('submit', handleAddClub);
-        clearAllButton.addEventListener('click', handleClearAll);
+        if (yardageForm) yardageForm.addEventListener('submit', handleAddClub);
+        if (clearAllButton) clearAllButton.addEventListener('click', handleClearAll);
         loadYardagesFromStorage();
         renderYardageTable();
     </script>
